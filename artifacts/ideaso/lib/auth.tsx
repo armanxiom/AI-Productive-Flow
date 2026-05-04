@@ -7,6 +7,7 @@ import React, {
   type ReactNode,
 } from "react";
 import * as AuthSession from "expo-auth-session";
+import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import * as SecureStore from "expo-secure-store";
 
@@ -53,6 +54,7 @@ function getClientId(): string {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [nonce] = useState(() => Crypto.randomUUID());
 
   const discovery = AuthSession.useAutoDiscovery(ISSUER_URL);
 
@@ -69,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       redirectUri,
       prompt: AuthSession.Prompt.Login,
       usePKCE: true,
+      extraParams: { nonce },
     },
     discovery,
   );
@@ -123,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             code_verifier: request.codeVerifier,
             redirect_uri: redirectUri,
             state,
-            nonce: request.nonce,
+            nonce,
           }),
         });
 
@@ -142,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     })();
-  }, [response, request, redirectUri, fetchUser]);
+  }, [response, request, redirectUri, fetchUser, nonce]);
 
   const login = useCallback(async () => {
     try {
