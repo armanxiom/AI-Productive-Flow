@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "_vqOsxqnNyi0YZL1U8807"
+uri = "file://artifacts/ideaso/assets/images/icon.png"
+type = "image"
+title = "generated_image"

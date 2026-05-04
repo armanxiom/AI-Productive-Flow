@@ -1,0 +1,300 @@
+Build Ideaso – An Offline-First, AI-Native Productivity App
+
+## Product Overview
+Ideaso is a mobile-first, offline-first productivity app for capturing ideas, organizing knowledge, managing tasks, and building workflows. It must be dramatically simpler than Notion, faster on mobile, and fully reliable offline. All user data lives locally first, syncs when online, and is never lost. AI turns rough thoughts into structured content (summaries, tasks, outlines) – not just a chatbot.
+
+## Core Product Principles
+- Offline-first by default (IndexedDB via Dexie, PWA).
+- Mobile-first and fast (<2s interactions on average device).
+- Simplicity over infinite flexibility – obvious UI with clear purpose per screen.
+- AI that creates structure, not just conversation.
+- Strong data safety (local encryption stubs, exports, version history).
+- Beautiful but minimal dark UI (Tailwind, shadcn/ui, Framer Motion).
+- Understandable in under 1 minute – no blank-canvas overwhelm.
+- Search must be instant (local index).
+- Reliable sync with conflict handling (last-writer-wins + revision history).
+
+## Target Users
+Students, content creators, freelancers, solo founders, small agencies, knowledge workers, and teams seeking a simpler Notion alternative.
+
+## MVP Features (Phase 1)
+### Data & Capture
+- Single quick-capture **Inbox** (one‑tap capture, works offline).
+- **Notes** editor (Markdown, clean interface).
+- **Tasks** (todo/in‑progress/done, optional due date).
+- **Tags** (colorful labels).
+- **Favorites** / **Recent items**.
+- **Templates** (pre‑built for study, creator, personal, team modes).
+### AI Actions (Basic)
+- Summarize a note.
+- Clean up messy note.
+- Convert note into tasks.
+- Turn raw idea into structured outline.
+### Collaboration & Workspace
+- **Authentication** (Supabase Auth).
+- **Workspace** creation (single user MVP, future multi‑user).
+### Search & Organization
+- Instant local search across notes, tasks, tags.
+- Search bar accessible from any screen.
+### Offline & Sync
+- Local storage (Dexie/IndexedDB) for all core data.
+- Sync queue for actions performed offline.
+- Background sync when online, push/pull API.
+- Conflict resolution with version history (revisions saved on change).
+- Offline status indicator (online/offline dot).
+### Export & Import
+- Export note to Markdown, all notes to JSON/CSV.
+- Import Markdown file.
+- (Stub) Notion import.
+### PWA
+- Manifest and service worker (app installable, offline caching).
+### UI/UX
+- Fully responsive (mobile‑first, large tap targets ≥44px).
+- Bottom navigation on mobile, minimal sidebar on desktop.
+- Calm, dark premium aesthetic (rounded cards, clean typography).
+- One clear purpose per screen: Home, Inbox, Notes, Tasks, Templates, Search, Settings, AI assistant.
+
+## Phase 2 Features (to be architected but not fully built now)
+- Databases, Relations, Kanban, Calendar, Timeline, Comments, Mentions.
+- Shared workspaces, role/permissions, page‑level permissions, Teamspaces.
+- Public page publishing, custom domain‑ready.
+- Voice note transcription, Automation builder, AI workspace generator.
+- Notion import full implementation.
+
+## Elite Future Features
+- Semantic memory graph, AI agent that builds pages/tasks/workflows.
+- Cross‑app integrations, E2E encrypted vaults, plugin marketplace, self‑host.
+
+## UX/UI Requirements (exact)
+- **Dark mode only** (surface: #121212, elevated: #1E1E1E, primary: #8B5CF6).
+- Navigation: hidden sidebar (slide‑over) on mobile, fixed topbar, bottom nav on mobile.
+- No complex navigation – 5 primary tabs on mobile: Home, Inbox, Notes, Tasks, Search.
+- Every screen must feel calm and organized; use `EmptyState` components when no content.
+- Smooth animations (Framer Motion `layout` and `AnimatePresence`).
+- Cards with `rounded-card` (1rem), ample spacing.
+- Typography: Inter (or system font), clear headings.
+
+## Technical Stack (mandatory)
+- **Next.js 15** (App Router).
+- **TypeScript** strict.
+- **Tailwind CSS** + **shadcn/ui** (Button, Input, Textarea, Card, Dialog, DropdownMenu).
+- **Framer Motion** for animations.
+- **Zustand** for UI state (online status, sidebar, active workspace, sync time).
+- **Dexie** (IndexedDB wrapper) for all local data.
+- **TanStack Query** (React Query) for server state / sync coordination.
+- **Supabase** for auth & sync (REST API or serverless routes).
+- **PWA** (manifest.json, service worker).
+- **Zod** for validation where needed.
+- **Web Crypto** stubs for future encryption.
+
+## Architecture Rules
+- **All data lives locally first.** Every mutation goes to Dexie, then optionally queues a sync item.
+- **Offline writes never blocked.** Sync queue processes when online.
+- **API routes** for sync (`/api/sync/push`, `/api/sync/pull`) and AI (`/api/ai`).
+- **No localStorage for app data** – only IndexedDB.
+- Code must be modular: components, lib, store folders.
+- Prefer real implementation over pseudocode. All files paste‑ready.
+- Include exact file names in the folder tree.
+
+## Complete Folder Structure (must create all files)
+ideaso/
+├── .env.local
+├── .gitignore
+├── next.config.ts
+├── package.json
+├── postcss.config.js
+├── tailwind.config.ts
+├── tsconfig.json
+├── public/
+│ ├── manifest.json
+│ └── sw.js
+├── src/
+│ ├── app/
+│ │ ├── layout.tsx
+│ │ ├── page.tsx
+│ │ ├── (auth)/
+│ │ │ ├── login/page.tsx
+│ │ │ └── signup/page.tsx
+│ │ ├── inbox/page.tsx
+│ │ ├── notes/
+│ │ │ ├── page.tsx
+│ │ │ └── [id]/page.tsx
+│ │ ├── tasks/page.tsx
+│ │ ├── templates/page.tsx
+│ │ ├── search/page.tsx
+│ │ ├── settings/page.tsx
+│ │ ├── ai/page.tsx
+│ │ └── api/
+│ │ ├── sync/
+│ │ │ ├── pull/route.ts
+│ │ │ └── push/route.ts
+│ │ └── ai/route.ts
+│ ├── components/
+│ │ ├── AppShell.tsx
+│ │ ├── Sidebar.tsx
+│ │ ├── Topbar.tsx
+│ │ ├── QuickCapture.tsx
+│ │ ├── NoteEditor.tsx
+│ │ ├── TaskBoard.tsx
+│ │ ├── TemplateGallery.tsx
+│ │ ├── SyncStatus.tsx
+│ │ ├── SearchBar.tsx
+│ │ ├── AIPanel.tsx
+│ │ ├── EmptyState.tsx
+│ │ └── MobileBottomNav.tsx
+│ │ └── ui/ (shadcn components: button, input, textarea, card, dialog, dropdown-menu)
+│ ├── lib/
+│ │ ├── db.ts
+│ │ ├── sync.ts
+│ │ ├── encryption.ts
+│ │ ├── ai.ts
+│ │ ├── templates.ts
+│ │ ├── export.ts
+│ │ ├── importers.ts
+│ │ ├── utils.ts
+│ │ └── types.ts
+│ ├── store/
+│ │ └── useAppStore.ts
+│ └── styles/
+│ └── globals.css
+
+text
+
+## Data Models (use as TypeScript types)
+```typescript
+interface User { id, email, fullName?, avatarUrl?, createdAt }
+interface Workspace { id, name, icon, ownerId, createdAt, updatedAt }
+interface Note { id, workspaceId, title, content, tags[], isFavorite, isPinned, isInbox, createdAt, updatedAt }
+interface Task { id, workspaceId, title, description, status('todo'|'in-progress'|'done'), dueDate?, tags[], createdAt, updatedAt }
+interface Tag { id, name, color }
+interface Template { id, workspaceId, name, type('note'|'task'), content, category }
+interface SyncQueueItem { id?, action('create'|'update'|'delete'), table('notes'|'tasks'|...), recordId, payload, timestamp, triedCount }
+interface Revision { id?, entityType, entityId, data, timestamp }
+interface AIActionLog { id?, action, input, output, createdAt }
+Implementation Instructions
+1. Project Setup
+Initialize Next.js with TypeScript, install all dependencies (see package.json above). Configure Tailwind with the custom dark palette. Copy globals.css and tailwind.config.ts as provided.
+
+2. Core Libraries
+Set up Dexie database with all tables in lib/db.ts. Export a singleton db.
+
+Create Zustand store with fields: isOnline, sidebarOpen, activeWorkspaceId, searchQuery, lastSyncAt.
+
+Implement lib/utils.ts with cn, generateId, formatDate, truncate.
+
+3. Local-First Data Operations
+Every page/component reads from Dexie (using db.notes.toArray(), etc.) and writes to Dexie. After a local write, call enqueueChange(action, table, recordId, payload) from lib/sync.ts. This automatically pushes if online.
+
+4. Sync Engine
+lib/sync.ts must:
+
+Queue actions into syncQueue table.
+
+pushQueuedItems() sends the queue to /api/sync/push as POST.
+
+pullRemoteChanges(workspaceId) GETs /api/sync/pull, then merges using last-writer-wins (compare updatedAt).
+
+Expose syncNow() that does push then pull, used by background interval (set every 30s) and manual sync button.
+
+Server routes: /api/sync/push receives array of queue items and upserts into Supabase tables; /api/sync/pull returns all rows for that workspace since last sync (or full dataset), handling timestamps.
+
+5. AI Features
+lib/ai.ts exports functions that call /api/ai route with a prompt. The API route uses OpenAI (or compatible) to:
+
+Summarize note
+
+Clean up note (grammar, structure)
+
+Convert note to tasks (list of tasks)
+
+Turn rough idea into an outline
+All AI results are stored in aiActionLog table.
+
+6. UI Components (All mobile‑first, dark, with shadcn/ui)
+AppShell: Wraps layout with Topbar, Sidebar (desktop), MobileBottomNav (mobile), and main content. Listens to online state and shows SyncStatus.
+
+Topbar: App logo, workspace name, search trigger, sync status dot, profile avatar.
+
+Sidebar: Nav links to Home, Inbox, Notes, Tasks, Templates, Settings, AI Assistant. Active state highlighted.
+
+MobileBottomNav: 5 buttons: Home, Inbox, Notes, Tasks, Search. Fixed bottom.
+
+QuickCapture: A minimal text input always accessible (e.g., floating button or top of Inbox) that saves to Inbox note instantly.
+
+NoteEditor: Full‑page or modal editor with title, content (Markdown), tags, favorite/pin toggles. Saves on every keystroke (debounced) to local DB and queues sync.
+
+TaskBoard: Kanban‑style columns (To Do, In Progress, Done) using TaskCard components. Drag‑and‑drop optional.
+
+TemplateGallery: Grid of cards; clicking one creates a new note/task from the template.
+
+SearchBar: Command+K style overlay that searches local notes/tasks/tags instantly.
+
+AIPanel: A drawer or sidebar with action buttons (Summarize, Clean Up, To Tasks, Outline) and result display.
+
+EmptyState: Illustration + message for first‑time users.
+
+SyncStatus: Small dot or badge showing online/offline and “Last synced X min ago”.
+
+7. Pages
+Home (/): Shows recent items, favorites, quick stats, and a prominent “Capture an idea” button.
+
+Inbox: QuickCapture input at top, list of isInbox notes, ability to swipe to move to Notes or Tasks.
+
+Notes: Grid/list of notes, sorted by updatedAt. Filter by tags. Click to edit.
+
+Notes/[id]: Full NoteEditor with AI actions accessible.
+
+Tasks: TaskBoard view.
+
+Templates: TemplateGallery.
+
+Search: Full‑page search results.
+
+Settings: Profile, workspace name, export options (Markdown, JSON, CSV), import, clear local data.
+
+AI Assistant: AIPanel in full width, with history of AI actions.
+
+Auth pages: Simple login/signup using Supabase UI/auth helpers.
+
+8. Offline & PWA
+Register service worker from public/sw.js in layout.tsx.
+
+Include <SyncStatus /> in Topbar.
+
+Listen to navigator.onLine and update Zustand isOnline.
+
+When offline, all writes go to Dexie and sync queue; upon reconnection, automatically sync.
+
+9. Versions History
+In every upsert function for notes/tasks, save a revision to revisions table before overwriting (create a Revision with the old data). This gives a simple “version history” that can be viewed later.
+
+10. Export/Import
+In Settings, use lib/export.ts functions to download files.
+
+Use lib/importers.ts to handle file uploads.
+
+Acceptance Criteria
+App installs as PWA on mobile.
+
+All core data (notes, tasks, tags) stay available when offline; can create, edit, delete.
+
+Sync resumes when coming online without conflicts.
+
+AI actions return meaningful results.
+
+App feels instantly understandable: no more than 5 main navigation items, every screen has a clear heading.
+
+UI is calm, dark, with consistent spacing and typography.
+
+Deliverables
+Full source code as described in the folder tree.
+
+Each file must contain actual, working TypeScript/React code (no placeholders except where noted).
+
+Provide all environment variables, build/run commands.
+
+Now build Ideaso.
+
+text
+
+You can use this prompt exactly as written to direct a developer or an AI coding tool to generate the entire app. If you'd like me to continue generating the remaining code parts (Part 2 onward), just say **“continue building Ideaso”**.
