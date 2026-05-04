@@ -14,3 +14,67 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * @summary Get current authenticated user
+ */
+export const GetCurrentAuthUserResponse = zod.object({
+  user: zod.union([
+    zod.object({
+      id: zod.string(),
+      email: zod.string().nullish(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+      profileImageUrl: zod.string().nullish(),
+    }),
+    zod.null(),
+  ]),
+});
+
+/**
+ * @summary Exchange mobile auth code for session token
+ */
+export const ExchangeMobileAuthorizationCodeBody = zod.object({
+  code: zod.string(),
+  code_verifier: zod.string(),
+  redirect_uri: zod.string(),
+  state: zod.string(),
+  nonce: zod.string().nullish(),
+});
+
+export const ExchangeMobileAuthorizationCodeResponse = zod.object({
+  token: zod.string(),
+});
+
+/**
+ * @summary Logout mobile session
+ */
+export const LogoutMobileSessionResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * @summary Fetch user's synced data
+ */
+export const GetDataSyncResponse = zod.object({
+  notes: zod.array(zod.unknown()),
+  tasks: zod.array(zod.unknown()),
+  tags: zod.array(zod.unknown()),
+  syncedAt: zod.string().nullable(),
+});
+
+/**
+ * @summary Save user's data
+ */
+export const PostDataSyncBody = zod.object({
+  notes: zod.array(zod.unknown()),
+  tasks: zod.array(zod.unknown()),
+  tags: zod.array(zod.unknown()),
+});
+
+export const PostDataSyncResponse = zod.object({
+  notes: zod.array(zod.unknown()),
+  tasks: zod.array(zod.unknown()),
+  tags: zod.array(zod.unknown()),
+  syncedAt: zod.string().nullable(),
+});

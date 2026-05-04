@@ -24,11 +24,23 @@ interface AIPanelProps {
   onApply?: (result: string) => void;
 }
 
-const ACTIONS: { id: AIAction; label: string; icon: string; description: string }[] = [
-  { id: "summarize", label: "Summarize", icon: "align-left", description: "Get a concise summary" },
-  { id: "cleanup", label: "Clean Up", icon: "edit-3", description: "Fix grammar & structure" },
-  { id: "to-tasks", label: "To Tasks", icon: "check-square", description: "Convert to action items" },
-  { id: "outline", label: "Outline", icon: "list", description: "Create structured outline" },
+const ACTIONS: {
+  id: AIAction;
+  label: string;
+  icon: string;
+  description: string;
+  color?: string;
+}[] = [
+  { id: "summarize", label: "Summarize", icon: "align-left", description: "2-3 sentence summary" },
+  { id: "cleanup", label: "Clean Up", icon: "edit-3", description: "Fix grammar & style" },
+  { id: "to-tasks", label: "To Tasks", icon: "check-square", description: "Extract action items" },
+  { id: "outline", label: "Outline", icon: "list", description: "Structured outline" },
+  { id: "expand", label: "Expand", icon: "maximize-2", description: "Turn brief into full note" },
+  { id: "key-points", label: "Key Points", icon: "target", description: "Extract core insights" },
+  { id: "title", label: "Title Ideas", icon: "type", description: "3 title suggestions" },
+  { id: "brainstorm", label: "Brainstorm", icon: "zap", description: "Related ideas & angles" },
+  { id: "fix-grammar", label: "Fix Grammar", icon: "check-circle", description: "Spelling & punctuation" },
+  { id: "meeting-notes", label: "Meeting Notes", icon: "users", description: "Format as meeting notes" },
 ];
 
 export function AIPanel({ visible, content, onClose, onApply }: AIPanelProps) {
@@ -55,6 +67,7 @@ export function AIPanel({ visible, content, onClose, onApply }: AIPanelProps) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
       setError("AI request failed. Check your connection and try again.");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
     }
@@ -79,9 +92,21 @@ export function AIPanel({ visible, content, onClose, onApply }: AIPanelProps) {
     onClose();
   };
 
+  const activeLabel = ACTIONS.find((a) => a.id === activeAction)?.label ?? "";
+
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
-      <View style={[styles.container, { backgroundColor: colors.background, paddingBottom: insets.bottom + 16 }]}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
+    >
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.background, paddingBottom: insets.bottom + 16 },
+        ]}
+      >
         <View style={[styles.topBar, { borderBottomColor: colors.border }]}>
           <View style={styles.topBarLeft}>
             <View style={[styles.aiDot, { backgroundColor: colors.primary }]} />
@@ -94,58 +119,85 @@ export function AIPanel({ visible, content, onClose, onApply }: AIPanelProps) {
 
         <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
           <View style={styles.actionsGrid}>
-            {ACTIONS.map((action) => (
-              <TouchableOpacity
-                key={action.id}
-                style={[
-                  styles.actionCard,
-                  {
-                    backgroundColor: activeAction === action.id ? colors.primary + "22" : colors.card,
-                    borderColor: activeAction === action.id ? colors.primary : colors.border,
-                    borderRadius: colors.radius,
-                  },
-                ]}
-                onPress={() => handleAction(action.id)}
-                activeOpacity={0.7}
-              >
-                <Feather
-                  name={action.icon as any}
-                  size={20}
-                  color={activeAction === action.id ? colors.primary : colors.mutedForeground}
-                />
-                <Text
+            {ACTIONS.map((action) => {
+              const isActive = activeAction === action.id;
+              return (
+                <TouchableOpacity
+                  key={action.id}
                   style={[
-                    styles.actionLabel,
-                    { color: activeAction === action.id ? colors.primary : colors.foreground },
+                    styles.actionCard,
+                    {
+                      backgroundColor: isActive ? colors.primary + "22" : colors.card,
+                      borderColor: isActive ? colors.primary : colors.border,
+                      borderRadius: colors.radius,
+                    },
                   ]}
+                  onPress={() => handleAction(action.id)}
+                  activeOpacity={0.7}
                 >
-                  {action.label}
-                </Text>
-                <Text style={[styles.actionDesc, { color: colors.mutedForeground }]}>
-                  {action.description}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Feather
+                    name={action.icon as any}
+                    size={18}
+                    color={isActive ? colors.primary : colors.mutedForeground}
+                  />
+                  <Text
+                    style={[
+                      styles.actionLabel,
+                      { color: isActive ? colors.primary : colors.foreground },
+                    ]}
+                  >
+                    {action.label}
+                  </Text>
+                  <Text style={[styles.actionDesc, { color: colors.mutedForeground }]}>
+                    {action.description}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {loading ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator size="small" color={colors.primary} />
               <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
-                Thinking...
+                Running {activeLabel}...
               </Text>
             </View>
           ) : null}
 
           {error ? (
-            <View style={[styles.resultBox, { backgroundColor: colors.destructive + "18", borderColor: colors.destructive + "44", borderRadius: colors.radius }]}>
+            <View
+              style={[
+                styles.resultBox,
+                {
+                  backgroundColor: colors.destructive + "18",
+                  borderColor: colors.destructive + "44",
+                  borderRadius: colors.radius,
+                },
+              ]}
+            >
               <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
             </View>
           ) : null}
 
           {result ? (
             <View>
-              <View style={[styles.resultBox, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
+              <View style={[styles.resultHeader]}>
+                <Feather name="cpu" size={14} color={colors.primary} />
+                <Text style={[styles.resultLabel, { color: colors.primary }]}>
+                  {activeLabel} result
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.resultBox,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.primary + "44",
+                    borderRadius: colors.radius,
+                  },
+                ]}
+              >
                 <Text style={[styles.resultText, { color: colors.foreground }]}>{result}</Text>
               </View>
               <View style={styles.resultActions}>
@@ -159,7 +211,10 @@ export function AIPanel({ visible, content, onClose, onApply }: AIPanelProps) {
                 </TouchableOpacity>
                 {onApply ? (
                   <TouchableOpacity
-                    style={[styles.resultBtn, { backgroundColor: colors.primary, borderRadius: 12, flex: 1 }]}
+                    style={[
+                      styles.resultBtn,
+                      { backgroundColor: colors.primary, borderRadius: 12, flex: 1 },
+                    ]}
                     onPress={handleApply}
                     activeOpacity={0.8}
                   >
@@ -177,9 +232,7 @@ export function AIPanel({ visible, content, onClose, onApply }: AIPanelProps) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   topBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -188,47 +241,14 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
   },
-  topBarLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  aiDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    fontFamily: "Inter_700Bold",
-  },
-  scroll: {
-    flex: 1,
-    padding: 20,
-  },
-  actionsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 20,
-  },
-  actionCard: {
-    width: "47%",
-    padding: 16,
-    borderWidth: 1,
-    gap: 8,
-  },
-  actionLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    fontFamily: "Inter_600SemiBold",
-  },
-  actionDesc: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    lineHeight: 16,
-  },
+  topBarLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  aiDot: { width: 8, height: 8, borderRadius: 4 },
+  title: { fontSize: 18, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  scroll: { flex: 1, padding: 20 },
+  actionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 20 },
+  actionCard: { width: "47%", padding: 14, borderWidth: 1, gap: 6 },
+  actionLabel: { fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  actionDesc: { fontSize: 11, fontFamily: "Inter_400Regular", lineHeight: 15 },
   loadingBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -236,30 +256,18 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     justifyContent: "center",
   },
-  loadingText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-  },
-  resultBox: {
-    padding: 16,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
-  resultText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    lineHeight: 22,
-  },
-  errorText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    lineHeight: 20,
-  },
-  resultActions: {
+  loadingText: { fontSize: 14, fontFamily: "Inter_400Regular" },
+  resultHeader: {
     flexDirection: "row",
-    gap: 10,
-    marginBottom: 20,
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
   },
+  resultLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 },
+  resultBox: { padding: 16, borderWidth: 1, marginBottom: 12 },
+  resultText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
+  errorText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20 },
+  resultActions: { flexDirection: "row", gap: 10, marginBottom: 20 },
   resultBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -267,9 +275,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  resultBtnText: {
-    fontSize: 14,
-    fontWeight: "600",
-    fontFamily: "Inter_600SemiBold",
-  },
+  resultBtnText: { fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
 });

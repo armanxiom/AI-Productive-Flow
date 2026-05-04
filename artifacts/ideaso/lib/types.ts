@@ -27,7 +27,17 @@ export interface Tag {
   color: string;
 }
 
-export type AIAction = "summarize" | "cleanup" | "to-tasks" | "outline";
+export type AIAction =
+  | "summarize"
+  | "cleanup"
+  | "to-tasks"
+  | "outline"
+  | "expand"
+  | "key-points"
+  | "title"
+  | "brainstorm"
+  | "fix-grammar"
+  | "meeting-notes";
 
 export interface AIActionResult {
   action: AIAction;

@@ -1,8 +1,10 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Note, Tag, Task } from "@/lib/types";
 import * as Storage from "@/lib/storage";
 import { generateId } from "@/lib/utils";
 import { TAG_COLORS as TC } from "@/constants/colors";
+import { syncToServer, fetchFromServer } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 type CreateNote = Omit<Note, "id" | "createdAt" | "updatedAt">;
 type CreateTask = Omit<Task, "id" | "createdAt" | "updatedAt">;
@@ -13,6 +15,8 @@ interface AppContextType {
   tasks: Task[];
   tags: Tag[];
   isLoading: boolean;
+  isSyncing: boolean;
+  lastSyncedAt: string | null;
   addNote: (note: CreateNote) => Promise<Note>;
   updateNote: (id: string, updates: Partial<Note>) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
@@ -22,6 +26,7 @@ interface AppContextType {
   addTag: (tag: CreateTag) => Promise<Tag>;
   deleteTag: (id: string) => Promise<void>;
   clearAllData: () => Promise<void>;
+  syncNow: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -38,7 +43,7 @@ function seedData(): { notes: Note[]; tasks: Task[]; tags: Tag[] } {
       id: generateId(),
       title: "Welcome to Ideaso",
       content:
-        "Capture ideas, organize knowledge, and manage your tasks — all in one place. Everything works offline and syncs when you're connected.",
+        "Capture ideas, organize knowledge, and manage your tasks — all in one place. Everything works offline and syncs when you're connected.\n\nTry the AI panel by tapping ⚡ in the note editor — it has 10 different AI actions to help you write, organize, and think.",
       tags: [tags[0].id],
       isFavorite: true,
       isPinned: true,
@@ -54,6 +59,18 @@ function seedData(): { notes: Note[]; tasks: Task[]; tags: Tag[] } {
       isFavorite: false,
       isPinned: false,
       isInbox: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: generateId(),
+      title: "Project notes",
+      content:
+        "Meeting with team on Thursday. Need to prepare:\n- Demo of the new feature\n- Q3 roadmap review\n- Budget discussion\n\nTry the 'Meeting Notes' AI action to format this properly!",
+      tags: [tags[1].id],
+      isFavorite: false,
+      isPinned: false,
+      isInbox: false,
       createdAt: now,
       updatedAt: now,
     },
@@ -77,15 +94,34 @@ function seedData(): { notes: Note[]; tasks: Task[]; tags: Tag[] } {
       createdAt: now,
       updatedAt: now,
     },
+    {
+      id: generateId(),
+      title: "Log in to sync across devices",
+      description: "Tap your profile in Settings to enable cloud sync.",
+      status: "todo",
+      tags: [tags[2].id],
+      createdAt: now,
+      updatedAt: now,
+    },
   ];
   return { notes, tasks, tags };
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [notes, setNotes] = useState<Note[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const notesRef = useRef<Note[]>([]);
+  const tasksRef = useRef<Task[]>([]);
+  const tagsRef = useRef<Tag[]>([]);
+
+  notesRef.current = notes;
+  tasksRef.current = tasks;
+  tagsRef.current = tags;
 
   useEffect(() => {
     const load = async () => {
@@ -117,81 +153,180 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     load();
   }, []);
 
-  const addNote = useCallback(async (partial: CreateNote): Promise<Note> => {
-    const now = new Date().toISOString();
-    const note: Note = { ...partial, id: generateId(), createdAt: now, updatedAt: now };
-    setNotes((prev) => {
-      const next = [note, ...prev];
-      Storage.saveNotes(next);
-      return next;
-    });
-    return note;
-  }, []);
+  const syncNow = useCallback(async () => {
+    if (!isAuthenticated || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const serverData = await fetchFromServer();
+      if (serverData && serverData.syncedAt) {
+        const serverTime = new Date(serverData.syncedAt).getTime();
+        const localNotes = notesRef.current;
+        const localTasks = tasksRef.current;
+        const localTags = tagsRef.current;
+        const hasLocalData = localNotes.length > 0 || localTasks.length > 0;
+        if (!hasLocalData && (serverData.notes.length > 0 || serverData.tasks.length > 0)) {
+          setNotes(serverData.notes);
+          setTasks(serverData.tasks);
+          setTags(serverData.tags);
+          await Storage.saveNotes(serverData.notes);
+          await Storage.saveTasks(serverData.tasks);
+          await Storage.saveTags(serverData.tags);
+        } else {
+          const mostRecentLocal = Math.max(
+            ...localNotes.map((n) => new Date(n.updatedAt).getTime()),
+            ...localTasks.map((t) => new Date(t.updatedAt).getTime()),
+            0,
+          );
+          if (mostRecentLocal > serverTime) {
+            await syncToServer({ notes: localNotes, tasks: localTasks, tags: localTags });
+          } else if (serverData.notes.length > localNotes.length) {
+            setNotes(serverData.notes);
+            setTasks(serverData.tasks);
+            setTags(serverData.tags);
+            await Storage.saveNotes(serverData.notes);
+            await Storage.saveTasks(serverData.tasks);
+            await Storage.saveTags(serverData.tags);
+          } else {
+            await syncToServer({ notes: localNotes, tasks: localTasks, tags: localTags });
+          }
+        }
+        setLastSyncedAt(new Date().toISOString());
+      } else {
+        await syncToServer({
+          notes: notesRef.current,
+          tasks: tasksRef.current,
+          tags: tagsRef.current,
+        });
+        setLastSyncedAt(new Date().toISOString());
+      }
+    } catch {
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [isAuthenticated, isSyncing]);
 
-  const updateNote = useCallback(async (id: string, updates: Partial<Note>) => {
-    setNotes((prev) => {
-      const next = prev.map((n) =>
-        n.id === id ? { ...n, ...updates, updatedAt: new Date().toISOString() } : n
-      );
-      Storage.saveNotes(next);
-      return next;
-    });
-  }, []);
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && !isLoading) {
+      syncNow();
+    }
+  }, [isAuthenticated, authLoading, isLoading]);
 
-  const deleteNote = useCallback(async (id: string) => {
-    setNotes((prev) => {
-      const next = prev.filter((n) => n.id !== id);
-      Storage.saveNotes(next);
-      return next;
-    });
-  }, []);
+  const pushToServer = useCallback(
+    (n: Note[], t: Task[], tg: Tag[]) => {
+      if (isAuthenticated) {
+        syncToServer({ notes: n, tasks: t, tags: tg }).catch(() => {});
+      }
+    },
+    [isAuthenticated],
+  );
 
-  const addTask = useCallback(async (partial: CreateTask): Promise<Task> => {
-    const now = new Date().toISOString();
-    const task: Task = { ...partial, id: generateId(), createdAt: now, updatedAt: now };
-    setTasks((prev) => {
-      const next = [task, ...prev];
-      Storage.saveTasks(next);
-      return next;
-    });
-    return task;
-  }, []);
+  const addNote = useCallback(
+    async (partial: CreateNote): Promise<Note> => {
+      const now = new Date().toISOString();
+      const note: Note = { ...partial, id: generateId(), createdAt: now, updatedAt: now };
+      setNotes((prev) => {
+        const next = [note, ...prev];
+        Storage.saveNotes(next);
+        pushToServer(next, tasksRef.current, tagsRef.current);
+        return next;
+      });
+      return note;
+    },
+    [pushToServer],
+  );
 
-  const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
-    setTasks((prev) => {
-      const next = prev.map((t) =>
-        t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
-      );
-      Storage.saveTasks(next);
-      return next;
-    });
-  }, []);
+  const updateNote = useCallback(
+    async (id: string, updates: Partial<Note>) => {
+      setNotes((prev) => {
+        const next = prev.map((n) =>
+          n.id === id ? { ...n, ...updates, updatedAt: new Date().toISOString() } : n,
+        );
+        Storage.saveNotes(next);
+        pushToServer(next, tasksRef.current, tagsRef.current);
+        return next;
+      });
+    },
+    [pushToServer],
+  );
 
-  const deleteTask = useCallback(async (id: string) => {
-    setTasks((prev) => {
-      const next = prev.filter((t) => t.id !== id);
-      Storage.saveTasks(next);
-      return next;
-    });
-  }, []);
+  const deleteNote = useCallback(
+    async (id: string) => {
+      setNotes((prev) => {
+        const next = prev.filter((n) => n.id !== id);
+        Storage.saveNotes(next);
+        pushToServer(next, tasksRef.current, tagsRef.current);
+        return next;
+      });
+    },
+    [pushToServer],
+  );
 
-  const addTag = useCallback(async (partial: CreateTag): Promise<Tag> => {
-    const tag: Tag = { ...partial, id: generateId() };
-    setTags((prev) => {
-      const next = [...prev, tag];
-      Storage.saveTags(next);
-      return next;
-    });
-    return tag;
-  }, []);
+  const addTask = useCallback(
+    async (partial: CreateTask): Promise<Task> => {
+      const now = new Date().toISOString();
+      const task: Task = { ...partial, id: generateId(), createdAt: now, updatedAt: now };
+      setTasks((prev) => {
+        const next = [task, ...prev];
+        Storage.saveTasks(next);
+        pushToServer(notesRef.current, next, tagsRef.current);
+        return next;
+      });
+      return task;
+    },
+    [pushToServer],
+  );
 
-  const deleteTag = useCallback(async (id: string) => {
-    setTags((prev) => {
-      const next = prev.filter((t) => t.id !== id);
-      Storage.saveTags(next);
-      return next;
-    });
-  }, []);
+  const updateTask = useCallback(
+    async (id: string, updates: Partial<Task>) => {
+      setTasks((prev) => {
+        const next = prev.map((t) =>
+          t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t,
+        );
+        Storage.saveTasks(next);
+        pushToServer(notesRef.current, next, tagsRef.current);
+        return next;
+      });
+    },
+    [pushToServer],
+  );
+
+  const deleteTask = useCallback(
+    async (id: string) => {
+      setTasks((prev) => {
+        const next = prev.filter((t) => t.id !== id);
+        Storage.saveTasks(next);
+        pushToServer(notesRef.current, next, tagsRef.current);
+        return next;
+      });
+    },
+    [pushToServer],
+  );
+
+  const addTag = useCallback(
+    async (partial: CreateTag): Promise<Tag> => {
+      const tag: Tag = { ...partial, id: generateId() };
+      setTags((prev) => {
+        const next = [...prev, tag];
+        Storage.saveTags(next);
+        pushToServer(notesRef.current, tasksRef.current, next);
+        return next;
+      });
+      return tag;
+    },
+    [pushToServer],
+  );
+
+  const deleteTag = useCallback(
+    async (id: string) => {
+      setTags((prev) => {
+        const next = prev.filter((t) => t.id !== id);
+        Storage.saveTags(next);
+        pushToServer(notesRef.current, tasksRef.current, next);
+        return next;
+      });
+    },
+    [pushToServer],
+  );
 
   const clearAllData = useCallback(async () => {
     await Storage.clearAll();
@@ -207,6 +342,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         tasks,
         tags,
         isLoading,
+        isSyncing,
+        lastSyncedAt,
         addNote,
         updateNote,
         deleteNote,
@@ -216,6 +353,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addTag,
         deleteTag,
         clearAllData,
+        syncNow,
       }}
     >
       {children}
