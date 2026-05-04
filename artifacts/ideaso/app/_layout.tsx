@@ -8,7 +8,8 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -38,20 +39,40 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-  });
+  // On web: Inter is loaded via CSS in +html.tsx — skip the CDN JS loader
+  // that uses fontfaceobserver (which times out in sandboxed environments).
+  // On native: load normally from Google Fonts CDN.
+  const [fontsLoaded, fontError] = useFonts(
+    Platform.OS !== "web"
+      ? { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold }
+      : {},
+  );
+
+  // `ready` becomes true when fonts are loaded, errored, or after a 3s timeout
+  // so the app never hangs indefinitely waiting for a CDN.
+  const [ready, setReady] = useState(Platform.OS === "web");
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
+    if (Platform.OS === "web") {
+      SplashScreen.hideAsync().catch(() => {});
+      return;
     }
+
+    const fallback = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+      setReady(true);
+    }, 3000);
+
+    if (fontsLoaded || fontError) {
+      clearTimeout(fallback);
+      SplashScreen.hideAsync().catch(() => {});
+      setReady(true);
+    }
+
+    return () => clearTimeout(fallback);
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if (!ready) return null;
 
   return (
     <SafeAreaProvider>

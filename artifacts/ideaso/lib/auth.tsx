@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  type ReactNode,
+} from "react";
 import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import * as SecureStore from "expo-secure-store";
@@ -49,7 +56,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const discovery = AuthSession.useAutoDiscovery(ISSUER_URL);
 
-  const redirectUri = AuthSession.makeRedirectUri();
+  // Use the app scheme for standalone builds; Expo Go uses exp:// automatically.
+  const redirectUri = AuthSession.makeRedirectUri({
+    scheme: "ideaso",
+    path: "auth",
+  });
 
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
@@ -57,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       scopes: ["openid", "email", "profile", "offline_access"],
       redirectUri,
       prompt: AuthSession.Prompt.Login,
+      usePKCE: true,
     },
     discovery,
   );
@@ -101,10 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const apiBase = getApiBaseUrl();
-        if (!apiBase) {
-          console.error("API base URL is not configured.");
-          return;
-        }
+        if (!apiBase) return;
 
         const exchangeRes = await fetch(`${apiBase}/api/mobile-auth/token-exchange`, {
           method: "POST",
@@ -119,7 +128,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         if (!exchangeRes.ok) {
-          console.error("Token exchange failed:", exchangeRes.status);
           setIsLoading(false);
           return;
         }
@@ -130,8 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsLoading(true);
           await fetchUser();
         }
-      } catch (err) {
-        console.error("Token exchange error:", err);
+      } catch {
         setIsLoading(false);
       }
     })();
@@ -140,8 +147,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async () => {
     try {
       await promptAsync();
-    } catch (err) {
-      console.error("Login error:", err);
+    } catch {
+      // Silently ignore login errors (user cancelled, etc.)
     }
   }, [promptAsync]);
 
@@ -156,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       }
     } catch {
+      // Ignore network errors on logout
     } finally {
       await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
       setUser(null);
